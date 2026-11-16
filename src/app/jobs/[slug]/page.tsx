@@ -19,7 +19,7 @@ export async function generateMetadata({
   }
 
   const title = `${job.title} at ${job.company} (${job.normalizedCity}) | Launchpad`;
-  const description = `Verified early career opening at ${job.company} for ${job.title}. Location: ${job.normalizedCity}. Direct application link verified.`;
+  const description = `Early career opportunity at ${job.company} for ${job.title}. Location: ${job.normalizedCity}. Direct application link verified.`;
 
   return {
     title,
@@ -53,12 +53,15 @@ export default async function JobDetailPage({
     notFound();
   }
 
+  const isClosed = (job as any).listingStatus === 'EXPIRED' || (job as any).listingStatus === 'REMOVED';
+
   const relatedJobs = SAMPLE_200_JOBS.filter(
-    j => j.id !== job.id && (j.standardRole === job.standardRole || j.normalizedCity === job.normalizedCity)
+    j => j.id !== job.id && (j as any).listingStatus === 'ACTIVE' &&
+         (j.standardRole === job.standardRole || j.normalizedCity === job.normalizedCity)
   ).slice(0, 3);
 
-  // Schema.org JobPosting JSON-LD for eligible verified jobs
-  const jsonLd = {
+  // Schema.org JobPosting structured data ONLY if listing is currently open
+  const jsonLd = !isClosed ? {
     '@context': 'https://schema.org',
     '@type': 'JobPosting',
     title: job.title,
@@ -84,33 +87,25 @@ export default async function JobDetailPage({
       },
     },
     directApply: true,
-  };
+  } : null;
 
   const getApplyButton = () => {
-    const status = (job as any).linkStatus || 'VERIFIED';
-    if (status === 'EXPIRED') {
+    if (isClosed) {
       return (
         <span className="px-6 py-3 rounded-lg bg-gray-800 text-gray-400 border border-gray-700 font-semibold text-sm cursor-not-allowed">
           Listing Closed by Company
         </span>
       );
     }
-    if (status === 'INVALID') {
-      return (
-        <span className="px-6 py-3 rounded-lg bg-rose-950/40 text-rose-300 border border-rose-800/40 font-semibold text-sm">
-          Source Expired
-        </span>
-      );
-    }
-    if (status === 'UNVERIFIED') {
+    if ((job as any).listingStatus === 'UNVERIFIED' || (job as any).listingStatus === 'POSSIBLY_EXPIRED') {
       return (
         <a
           href={job.applyUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="px-6 py-3 rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30 font-semibold text-sm transition-all"
+          className="px-6 py-3 rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/30 font-semibold text-sm transition-all"
         >
-          Open Original Listing ↗
+          Check Original Listing ↗
         </a>
       );
     }
@@ -128,28 +123,49 @@ export default async function JobDetailPage({
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
+      {jsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      )}
 
       <Link href="/jobs" className="text-xs font-mono text-emerald-400 hover:underline mb-6 inline-flex items-center gap-1">
         ← Back to All Verified Opportunities
       </Link>
 
-      <div className="p-8 rounded-2xl border border-[#232b30] bg-[#111518]">
+      {/* Closed Banner Notification if Expired/Removed */}
+      {isClosed && (
+        <div className="mb-6 p-4 rounded-xl border border-rose-900/40 bg-rose-950/20 text-xs font-mono text-rose-300 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-rose-400" />
+            <span>This opportunity is no longer accepting applications ({ (job as any).statusReason || 'Posting closed by employer' }).</span>
+          </div>
+          <span className="text-gray-400">Archived Record</span>
+        </div>
+      )}
+
+      <div className={`p-8 rounded-2xl border bg-[#111518] ${isClosed ? 'border-gray-800' : 'border-[#232b30]'}`}>
         <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-[#232b30]">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs uppercase tracking-wider font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full">
-                {(job as any).fresherEligibilityStatus || (job.employmentType === 'internship' ? 'Internship' : 'Fresher eligible')}
+              <span className={`text-xs uppercase tracking-wider font-mono px-2.5 py-0.5 rounded-full border ${
+                isClosed
+                  ? 'border-rose-900/40 bg-rose-950/20 text-rose-400'
+                  : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+              }`}>
+                {isClosed ? 'Listing Closed' : ((job as any).fresherEligibilityStatus || 'Fresher eligible')}
               </span>
               <span className="text-xs font-mono text-gray-400 border border-[#232b30] px-2 py-0.5 rounded-full bg-[#0a0d0e]">
                 Source: {job.sourceName}
               </span>
-              {(job as any).linkStatus && (
-                <span className="text-[11px] font-mono text-gray-400 border border-[#232b30] px-2 py-0.5 rounded-full bg-[#0a0d0e]">
-                  Link: {(job as any).linkStatus}
+              {(job as any).listingStatus && (
+                <span className={`text-[11px] font-mono px-2 py-0.5 rounded-full border ${
+                  (job as any).listingStatus === 'ACTIVE'
+                    ? 'border-emerald-500/20 bg-emerald-500/5 text-emerald-400'
+                    : 'border-rose-500/20 bg-rose-500/5 text-rose-400'
+                }`}>
+                  Status: {(job as any).listingStatus}
                 </span>
               )}
             </div>
@@ -177,9 +193,9 @@ export default async function JobDetailPage({
             <div className="text-sm font-semibold text-gray-200 mt-1 capitalize">{job.workMode}</div>
           </div>
           <div>
-            <div className="text-xs font-mono text-gray-500 uppercase">AI Confidence</div>
+            <div className="text-xs font-mono text-gray-500 uppercase">Last Verified</div>
             <div className="text-sm font-semibold text-emerald-400 font-mono mt-1">
-              {(job.aiConfidence * 100).toFixed(1)}% (Gemini Flash)
+              {(job as any).sourceLastVerifiedAt ? new Date((job as any).sourceLastVerifiedAt).toLocaleDateString() : 'Today'}
             </div>
           </div>
         </div>
@@ -239,10 +255,10 @@ export default async function JobDetailPage({
           </p>
 
           <div className="p-4 rounded-xl border border-[#232b30] bg-[#0a0d0e] mt-6">
-            <div className="text-xs font-mono text-gray-400 uppercase tracking-wider">Provenance & Anti-Hallucination Audit Trail</div>
+            <div className="text-xs font-mono text-gray-400 uppercase tracking-wider">Provenance & Source-of-Truth Audit Trail</div>
             <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-              Ingested from {job.sourceName}. Destination URL: <code className="text-emerald-400 font-mono break-all">{job.applyUrl}</code>.
-              Discovered: {new Date(job.discoveredAt).toLocaleDateString()}.
+              Source: {job.sourceName}. Destination: <code className="text-emerald-400 font-mono break-all">{job.applyUrl}</code>.
+              {(job as any).statusReason && <span> Verification note: {(job as any).statusReason}.</span>}
             </p>
           </div>
         </div>
@@ -251,7 +267,7 @@ export default async function JobDetailPage({
       {/* Related Opportunities */}
       {relatedJobs.length > 0 && (
         <div className="mt-12">
-          <h2 className="text-lg font-bold text-white mb-4">Related Opportunities in {job.normalizedCity} or {job.standardRole}</h2>
+          <h2 className="text-lg font-bold text-white mb-4">Related Active Opportunities in {job.normalizedCity} or {job.standardRole}</h2>
           <div className="grid md:grid-cols-3 gap-4">
             {relatedJobs.map(rel => (
               <Link

@@ -15,6 +15,7 @@ interface JobCardData {
   employmentType: string;
   applyUrl: string;
   sourceName: string;
+  listingStatus?: string;
   linkStatus?: string;
   fresherEligibilityStatus?: string;
   isFresherEligible: boolean;
@@ -30,6 +31,7 @@ function JobsContent() {
   const initialRole = searchParams.get('role') || 'All';
   const initialCity = searchParams.get('city') || 'All';
   const initialType = searchParams.get('type') || 'All';
+  const initialStatus = searchParams.get('status') || 'ACTIVE';
   const initialPage = parseInt(searchParams.get('page') || '1', 10);
 
   const [search, setSearch] = useState(initialQ);
@@ -37,13 +39,13 @@ function JobsContent() {
   const [selectedRole, setSelectedRole] = useState(initialRole);
   const [selectedCity, setSelectedCity] = useState(initialCity);
   const [selectedType, setSelectedType] = useState(initialType);
+  const [selectedStatus, setSelectedStatus] = useState(initialStatus);
   const [currentPage, setCurrentPage] = useState(initialPage);
   const [sortBy, setSortBy] = useState('newest');
 
   const [jobs, setJobs] = useState<JobCardData[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 250ms search debounce to prevent janky client updates
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(search);
@@ -52,7 +54,6 @@ function JobsContent() {
     return () => clearTimeout(handler);
   }, [search]);
 
-  // Load genuine job data
   useEffect(() => {
     async function loadData() {
       try {
@@ -75,22 +76,28 @@ function JobsContent() {
     loadData();
   }, []);
 
-  // Sync state back to URL query parameters
   useEffect(() => {
     const params = new URLSearchParams();
     if (debouncedSearch) params.set('q', debouncedSearch);
     if (selectedRole !== 'All') params.set('role', selectedRole);
     if (selectedCity !== 'All') params.set('city', selectedCity);
     if (selectedType !== 'All') params.set('type', selectedType);
+    if (selectedStatus !== 'ACTIVE') params.set('status', selectedStatus);
     if (currentPage > 1) params.set('page', String(currentPage));
 
     const newQuery = params.toString();
     const newUrl = newQuery ? `/jobs?${newQuery}` : '/jobs';
     window.history.replaceState(null, '', newUrl);
-  }, [debouncedSearch, selectedRole, selectedCity, selectedType, currentPage]);
+  }, [debouncedSearch, selectedRole, selectedCity, selectedType, selectedStatus, currentPage]);
 
   const filteredJobs = useMemo(() => {
     let result = jobs.filter(job => {
+      // Status filtering: default is confirmed ACTIVE
+      const currentListingStatus = job.listingStatus || 'ACTIVE';
+      if (selectedStatus !== 'ALL' && currentListingStatus !== selectedStatus) {
+        return false;
+      }
+
       const matchSearch = debouncedSearch === '' ||
         job.title.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
         job.company.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
@@ -112,7 +119,7 @@ function JobsContent() {
     }
 
     return result;
-  }, [jobs, debouncedSearch, selectedRole, selectedCity, selectedType, sortBy]);
+  }, [jobs, debouncedSearch, selectedRole, selectedCity, selectedType, selectedStatus, sortBy]);
 
   const pageSize = 15;
   const totalPages = Math.ceil(filteredJobs.length / pageSize) || 1;
@@ -127,34 +134,28 @@ function JobsContent() {
     setSelectedRole('All');
     setSelectedCity('All');
     setSelectedType('All');
+    setSelectedStatus('ACTIVE');
     setCurrentPage(1);
   };
 
   const getApplyButton = (job: JobCardData) => {
-    const status = job.linkStatus || 'VERIFIED';
-    if (status === 'EXPIRED') {
+    const isClosed = job.listingStatus === 'EXPIRED' || job.listingStatus === 'REMOVED';
+    if (isClosed) {
       return (
         <span className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-gray-800 text-gray-400 border border-gray-700 cursor-not-allowed">
-          Listing Closed
+          Listing Closed by Company
         </span>
       );
     }
-    if (status === 'INVALID') {
-      return (
-        <span className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-rose-950/40 text-rose-300 border border-rose-800/40">
-          Source Expired
-        </span>
-      );
-    }
-    if (status === 'UNVERIFIED') {
+    if (job.listingStatus === 'UNVERIFIED' || job.listingStatus === 'POSSIBLY_EXPIRED') {
       return (
         <a
           href={job.applyUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30 transition-colors"
+          className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/30 transition-colors"
         >
-          Open Original Listing ↗
+          Check Original Source ↗
         </a>
       );
     }
@@ -177,15 +178,15 @@ function JobsContent() {
         <div>
           <h1 className="text-3xl font-extrabold text-white tracking-tight">Verified Fresher Opportunities</h1>
           <p className="text-sm text-gray-400 mt-1">
-            Real-time deduplicated & AI-categorized openings across India.
+            Authoritative source-of-truth verified opportunities across India. Stale and expired postings are proactively detected.
           </p>
         </div>
         <div className="flex items-center gap-3">
           <div className="text-xs font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-lg flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            Showing {filteredJobs.length} verified listings
+            Showing {filteredJobs.length} {selectedStatus === 'ACTIVE' ? 'confirmed active' : 'matching'} listings
           </div>
-          {(search || selectedRole !== 'All' || selectedCity !== 'All' || selectedType !== 'All') && (
+          {(search || selectedRole !== 'All' || selectedCity !== 'All' || selectedType !== 'All' || selectedStatus !== 'ACTIVE') && (
             <button
               onClick={clearAllFilters}
               className="text-xs font-mono text-gray-400 hover:text-white underline"
@@ -198,11 +199,11 @@ function JobsContent() {
 
       {/* Filter Toolbar */}
       <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 p-4 rounded-xl border border-[#232b30] bg-[#111518]/90">
-        <div className="lg:col-span-2">
+        <div>
           <label className="block text-[11px] font-mono uppercase text-gray-400 mb-1.5">Search Keywords</label>
           <input
             type="text"
-            placeholder="Title, company, or skill (e.g. React, Python, SDE)..."
+            placeholder="Title, company, or skill..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full bg-[#0a0d0e] border border-[#232b30] rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 transition-colors"
@@ -224,7 +225,7 @@ function JobsContent() {
             <option value="Data Engineering">Data Engineering</option>
             <option value="DevOps / Cloud / SRE">DevOps / Cloud / SRE</option>
             <option value="QA / Software Testing / SDET">QA / Testing / SDET</option>
-            <option value="Product Design / UI/UX">Product Design / UI/UX</option>
+            <option value="Software Engineering">Software Engineering</option>
           </select>
         </div>
 
@@ -241,8 +242,21 @@ function JobsContent() {
             <option value="Pune">Pune</option>
             <option value="Delhi NCR">Delhi NCR</option>
             <option value="Mumbai">Mumbai</option>
-            <option value="Chennai">Chennai</option>
             <option value="Remote (India)">Remote (India)</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-mono uppercase text-gray-400 mb-1.5">Lifecycle Status</label>
+          <select
+            value={selectedStatus}
+            onChange={(e) => { setSelectedStatus(e.target.value); setCurrentPage(1); }}
+            className="w-full bg-[#0a0d0e] border border-[#232b30] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors"
+          >
+            <option value="ACTIVE">Confirmed Active (Default)</option>
+            <option value="EXPIRED">Closed / Expired</option>
+            <option value="REMOVED">Removed by Source</option>
+            <option value="ALL">All Statuses (Audit Mode)</option>
           </select>
         </div>
 
@@ -279,60 +293,76 @@ function JobsContent() {
         </div>
       ) : (
         <div className="mt-8 space-y-4">
-          {paginatedList.map((job) => (
-            <div
-              key={job.id}
-              className="p-5 rounded-xl border border-[#232b30] bg-[#111518] hover:border-[#374151] transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 group"
-            >
-              <div className="space-y-2 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-bold text-white text-base group-hover:text-emerald-400 transition-colors">
-                    {job.company}
-                  </span>
-                  <span className="text-xs px-2 py-0.5 rounded-full border border-[#232b30] bg-[#0a0d0e] text-gray-300 font-mono">
-                    {job.sourceName}
-                  </span>
-                  <span className="text-xs px-2 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 font-mono">
-                    {job.fresherEligibilityStatus || (job.employmentType === 'internship' ? 'Internship' : 'Fresher eligible')}
-                  </span>
-                </div>
-
-                <h3 className="text-lg font-semibold text-gray-100">{job.title}</h3>
-
-                <div className="flex flex-wrap items-center gap-4 text-xs text-gray-400">
-                  <span className="flex items-center gap-1">📍 {job.normalizedCity}</span>
-                  <span className="flex items-center gap-1">💼 {job.standardRole}</span>
-                  <span className="flex items-center gap-1 capitalize">⏳ {job.employmentType.replace('_', ' ')}</span>
-                  <span className="flex items-center gap-1 capitalize">🏢 {job.workMode}</span>
-                  <span className="font-mono text-emerald-400/80">AI Confidence: {(job.aiConfidence * 100).toFixed(0)}%</span>
-                </div>
-
-                {/* Skills */}
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {job.requiredSkills.map((skill, sIdx) => (
-                    <span key={sIdx} className="text-xs bg-[#161c20] text-gray-300 border border-[#232b30] px-2 py-0.5 rounded">
-                      {skill}
+          {paginatedList.map((job) => {
+            const isClosed = job.listingStatus === 'EXPIRED' || job.listingStatus === 'REMOVED';
+            return (
+              <div
+                key={job.id}
+                className={`p-5 rounded-xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 group ${
+                  isClosed
+                    ? 'border-gray-800 bg-[#0d1012] opacity-75'
+                    : 'border-[#232b30] bg-[#111518] hover:border-[#374151]'
+                }`}
+              >
+                <div className="space-y-2 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-bold text-white text-base group-hover:text-emerald-400 transition-colors">
+                      {job.company}
                     </span>
-                  ))}
+                    <span className="text-xs px-2 py-0.5 rounded-full border border-[#232b30] bg-[#0a0d0e] text-gray-300 font-mono">
+                      {job.sourceName}
+                    </span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full border font-mono ${
+                      isClosed
+                        ? 'border-rose-900/40 bg-rose-950/20 text-rose-400'
+                        : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                    }`}>
+                      {isClosed ? 'Listing Closed' : (job.fresherEligibilityStatus || 'Fresher eligible')}
+                    </span>
+                    {job.listingStatus && (
+                      <span className={`text-[11px] font-mono px-2 py-0.5 rounded-full border ${
+                        job.listingStatus === 'ACTIVE'
+                          ? 'border-emerald-500/20 bg-emerald-500/5 text-emerald-400'
+                          : 'border-rose-500/20 bg-rose-500/5 text-rose-400'
+                      }`}>
+                        Lifecycle: {job.listingStatus}
+                      </span>
+                    )}
+                  </div>
+
+                  <h3 className="text-lg font-semibold text-gray-100">{job.title}</h3>
+
+                  <div className="flex flex-wrap items-center gap-4 text-xs text-gray-400">
+                    <span className="flex items-center gap-1">📍 {job.normalizedCity}</span>
+                    <span className="flex items-center gap-1">💼 {job.standardRole}</span>
+                    <span className="flex items-center gap-1 capitalize">⏳ {job.employmentType.replace('_', ' ')}</span>
+                    <span className="flex items-center gap-1 capitalize">🏢 {job.workMode}</span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {job.requiredSkills.map((skill, sIdx) => (
+                      <span key={sIdx} className="text-xs bg-[#161c20] text-gray-300 border border-[#232b30] px-2 py-0.5 rounded">
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 self-start md:self-center">
+                  <Link
+                    href={`/jobs/${job.slug}`}
+                    className="px-4 py-2 text-xs font-semibold rounded-lg border border-[#232b30] bg-[#161c20] hover:bg-[#232b30] text-gray-200 transition-colors"
+                  >
+                    View Details
+                  </Link>
+                  {getApplyButton(job)}
                 </div>
               </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center gap-3 self-start md:self-center">
-                <Link
-                  href={`/jobs/${job.slug}`}
-                  className="px-4 py-2 text-xs font-semibold rounded-lg border border-[#232b30] bg-[#161c20] hover:bg-[#232b30] text-gray-200 transition-colors"
-                >
-                  View Details
-                </Link>
-                {getApplyButton(job)}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
-      {/* Pagination Controls */}
       {totalPages > 1 && (
         <div className="mt-10 flex items-center justify-between border-t border-[#232b30] pt-6">
           <div className="text-xs text-gray-400 font-mono">
