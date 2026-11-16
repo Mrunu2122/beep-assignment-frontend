@@ -19,7 +19,7 @@ export async function generateMetadata({
   }
 
   const title = `${job.title} at ${job.company} (${job.normalizedCity}) | Launchpad`;
-  const description = `Verified 0-1 exp fresher opening at ${job.company} for ${job.title}. Location: ${job.normalizedCity}. Direct application link verified.`;
+  const description = `Verified early career opening at ${job.company} for ${job.title}. Location: ${job.normalizedCity}. Direct application link verified.`;
 
   return {
     title,
@@ -73,7 +73,7 @@ export default async function JobDetailPage({
     hiringOrganization: {
       '@type': 'Organization',
       name: job.company,
-      sameAs: `https://careers.${job.companySlug}.com`,
+      sameAs: job.applicationUrl,
     },
     jobLocation: {
       '@type': 'Place',
@@ -86,9 +86,48 @@ export default async function JobDetailPage({
     directApply: true,
   };
 
+  const getApplyButton = () => {
+    const status = (job as any).linkStatus || 'VERIFIED';
+    if (status === 'EXPIRED') {
+      return (
+        <span className="px-6 py-3 rounded-lg bg-gray-800 text-gray-400 border border-gray-700 font-semibold text-sm cursor-not-allowed">
+          Listing Closed by Company
+        </span>
+      );
+    }
+    if (status === 'INVALID') {
+      return (
+        <span className="px-6 py-3 rounded-lg bg-rose-950/40 text-rose-300 border border-rose-800/40 font-semibold text-sm">
+          Source Expired
+        </span>
+      );
+    }
+    if (status === 'UNVERIFIED') {
+      return (
+        <a
+          href={job.applyUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-6 py-3 rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30 font-semibold text-sm transition-all"
+        >
+          Open Original Listing ↗
+        </a>
+      );
+    }
+    return (
+      <a
+        href={job.applyUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="px-6 py-3 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-sm transition-all shadow-[0_0_20px_-3px_rgba(34,197,94,0.4)]"
+      >
+        Apply at Company ↗
+      </a>
+    );
+  };
+
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12">
-      {/* Structured Schema.org JobPosting for search engines */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -98,30 +137,29 @@ export default async function JobDetailPage({
         ← Back to All Verified Opportunities
       </Link>
 
-      {/* Main Job Card */}
       <div className="p-8 rounded-2xl border border-[#232b30] bg-[#111518]">
         <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-[#232b30]">
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs uppercase tracking-wider font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full">
-                0-Exp Verified Fresher
+                {(job as any).fresherEligibilityStatus || (job.employmentType === 'internship' ? 'Internship' : 'Fresher eligible')}
               </span>
               <span className="text-xs font-mono text-gray-400 border border-[#232b30] px-2 py-0.5 rounded-full bg-[#0a0d0e]">
                 Source: {job.sourceName}
               </span>
+              {(job as any).linkStatus && (
+                <span className="text-[11px] font-mono text-gray-400 border border-[#232b30] px-2 py-0.5 rounded-full bg-[#0a0d0e]">
+                  Link: {(job as any).linkStatus}
+                </span>
+              )}
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold text-white mt-3">{job.title}</h1>
             <p className="text-base text-emerald-400 font-semibold mt-1">{job.company}</p>
           </div>
 
-          <a
-            href={job.applyUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-6 py-3 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-sm transition-all shadow-[0_0_20px_-3px_rgba(34,197,94,0.4)]"
-          >
-            Apply Directly at Source ↗
-          </a>
+          <div>
+            {getApplyButton()}
+          </div>
         </div>
 
         {/* Multi-facet Metadata Grid */}
@@ -146,9 +184,44 @@ export default async function JobDetailPage({
           </div>
         </div>
 
+        {/* AI-Generated Summary */}
+        {(job as any).aiSummary && (
+          <div className="py-5 border-b border-[#232b30] bg-[#161c20]/50 -mx-8 px-8">
+            <div className="text-xs font-mono text-emerald-400 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+              <span>✦</span> AI-Generated Summary (Derived exclusively from original source)
+            </div>
+            <p className="text-xs text-gray-300 leading-relaxed">
+              {(job as any).aiSummary}
+            </p>
+          </div>
+        )}
+
+        {/* Responsibilities & Qualifications if available */}
+        {(job as any).responsibilities && (job as any).responsibilities.length > 0 && (
+          <div className="py-6 border-b border-[#232b30]">
+            <h2 className="text-sm font-bold text-white uppercase tracking-wider mb-3">Key Responsibilities</h2>
+            <ul className="list-disc list-inside text-xs text-gray-300 space-y-1.5 leading-relaxed">
+              {(job as any).responsibilities.map((r: string, idx: number) => (
+                <li key={idx}>{r}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {(job as any).qualifications && (job as any).qualifications.length > 0 && (
+          <div className="py-6 border-b border-[#232b30]">
+            <h2 className="text-sm font-bold text-white uppercase tracking-wider mb-3">Candidate Qualifications</h2>
+            <ul className="list-disc list-inside text-xs text-gray-300 space-y-1.5 leading-relaxed">
+              {(job as any).qualifications.map((q: string, idx: number) => (
+                <li key={idx}>{q}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {/* Required Skills */}
         <div className="py-6 border-b border-[#232b30]">
-          <h2 className="text-xs font-mono text-gray-400 uppercase tracking-wider mb-3">Key Technical Competencies</h2>
+          <h2 className="text-xs font-mono text-gray-400 uppercase tracking-wider mb-3">Technical Competencies</h2>
           <div className="flex flex-wrap gap-2">
             {job.requiredSkills.map((skill, sIdx) => (
               <span key={sIdx} className="text-xs font-mono bg-[#161c20] text-emerald-300 border border-emerald-500/20 px-3 py-1 rounded-md">
@@ -160,16 +233,16 @@ export default async function JobDetailPage({
 
         {/* Description & Transparency */}
         <div className="mt-6 space-y-4 text-sm text-gray-300 leading-relaxed">
-          <h2 className="text-base font-semibold text-white">Original Role Description</h2>
-          <p className="whitespace-pre-line text-gray-300 bg-[#0a0d0e]/60 p-4 rounded-xl border border-[#232b30]">
+          <h2 className="text-base font-semibold text-white">Full Sourced Job Details</h2>
+          <p className="whitespace-pre-line text-xs text-gray-300 bg-[#0a0d0e]/60 p-4 rounded-xl border border-[#232b30] leading-relaxed">
             {job.description}
           </p>
 
           <div className="p-4 rounded-xl border border-[#232b30] bg-[#0a0d0e] mt-6">
             <div className="text-xs font-mono text-gray-400 uppercase tracking-wider">Provenance & Anti-Hallucination Audit Trail</div>
             <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-              Ingested from {job.sourceName}. Deduplication Hash: <code className="text-emerald-400 font-mono">{job.canonicalHash.substring(0, 16)}...</code>.
-              Discovered: {new Date(job.discoveredAt).toLocaleDateString()}. Direct apply link verified without affiliate redirection.
+              Ingested from {job.sourceName}. Destination URL: <code className="text-emerald-400 font-mono break-all">{job.applyUrl}</code>.
+              Discovered: {new Date(job.discoveredAt).toLocaleDateString()}.
             </p>
           </div>
         </div>

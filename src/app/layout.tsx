@@ -34,7 +34,6 @@ export default function RootLayout({
               <Link href="/jobs" className="hover:text-white transition-colors">Explore Jobs</Link>
               <Link href="/methodology" className="hover:text-white transition-colors">Methodology & AI</Link>
               <Link href="/about" className="hover:text-white transition-colors">System Transparency</Link>
-              <Link href="/admin" className="hover:text-emerald-400 font-mono text-xs transition-colors">Admin Console</Link>
             </nav>
 
             <div className="flex items-center gap-3">
@@ -64,7 +63,6 @@ export default function RootLayout({
               <Link href="/methodology" className="hover:text-emerald-400 transition-colors">Deduplication Logic</Link>
               <Link href="/about" className="hover:text-emerald-400 transition-colors">Cost Model</Link>
               <Link href="/about" className="hover:text-emerald-400 transition-colors">50-Post Benchmark</Link>
-              <Link href="/admin" className="hover:text-emerald-400 transition-colors">Admin</Link>
             </div>
           </div>
         </footer>

@@ -15,6 +15,8 @@ interface JobCardData {
   employmentType: string;
   applyUrl: string;
   sourceName: string;
+  linkStatus?: string;
+  fresherEligibilityStatus?: string;
   isFresherEligible: boolean;
   requiredSkills: string[];
   aiConfidence: number;
@@ -24,7 +26,6 @@ interface JobCardData {
 function JobsContent() {
   const searchParams = useSearchParams();
 
-  // URL state synchronization
   const initialQ = searchParams.get('q') || '';
   const initialRole = searchParams.get('role') || 'All';
   const initialCity = searchParams.get('city') || 'All';
@@ -32,6 +33,7 @@ function JobsContent() {
   const initialPage = parseInt(searchParams.get('page') || '1', 10);
 
   const [search, setSearch] = useState(initialQ);
+  const [debouncedSearch, setDebouncedSearch] = useState(initialQ);
   const [selectedRole, setSelectedRole] = useState(initialRole);
   const [selectedCity, setSelectedCity] = useState(initialCity);
   const [selectedType, setSelectedType] = useState(initialType);
@@ -41,7 +43,16 @@ function JobsContent() {
   const [jobs, setJobs] = useState<JobCardData[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch full dataset
+  // 250ms search debounce to prevent janky client updates
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+      setCurrentPage(1);
+    }, 250);
+    return () => clearTimeout(handler);
+  }, [search]);
+
+  // Load genuine job data
   useEffect(() => {
     async function loadData() {
       try {
@@ -52,11 +63,11 @@ function JobsContent() {
           setJobs(json);
         } else {
           const staticSeed = await import('@/lib/sample-jobs');
-          setJobs(staticSeed.SAMPLE_200_JOBS);
+          setJobs(staticSeed.SAMPLE_200_JOBS as unknown as JobCardData[]);
         }
       } catch {
         const staticSeed = await import('@/lib/sample-jobs');
-        setJobs(staticSeed.SAMPLE_200_JOBS);
+        setJobs(staticSeed.SAMPLE_200_JOBS as unknown as JobCardData[]);
       } finally {
         setLoading(false);
       }
@@ -67,7 +78,7 @@ function JobsContent() {
   // Sync state back to URL query parameters
   useEffect(() => {
     const params = new URLSearchParams();
-    if (search) params.set('q', search);
+    if (debouncedSearch) params.set('q', debouncedSearch);
     if (selectedRole !== 'All') params.set('role', selectedRole);
     if (selectedCity !== 'All') params.set('city', selectedCity);
     if (selectedType !== 'All') params.set('type', selectedType);
@@ -76,14 +87,14 @@ function JobsContent() {
     const newQuery = params.toString();
     const newUrl = newQuery ? `/jobs?${newQuery}` : '/jobs';
     window.history.replaceState(null, '', newUrl);
-  }, [search, selectedRole, selectedCity, selectedType, currentPage]);
+  }, [debouncedSearch, selectedRole, selectedCity, selectedType, currentPage]);
 
   const filteredJobs = useMemo(() => {
     let result = jobs.filter(job => {
-      const matchSearch = search === '' ||
-        job.title.toLowerCase().includes(search.toLowerCase()) ||
-        job.company.toLowerCase().includes(search.toLowerCase()) ||
-        job.requiredSkills.some(s => s.toLowerCase().includes(search.toLowerCase()));
+      const matchSearch = debouncedSearch === '' ||
+        job.title.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+        job.company.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+        job.requiredSkills.some(s => s.toLowerCase().includes(debouncedSearch.toLowerCase()));
 
       const matchRole = selectedRole === 'All' || job.standardRole === selectedRole;
       const matchCity = selectedCity === 'All' || job.normalizedCity === selectedCity;
@@ -101,9 +112,8 @@ function JobsContent() {
     }
 
     return result;
-  }, [jobs, search, selectedRole, selectedCity, selectedType, sortBy]);
+  }, [jobs, debouncedSearch, selectedRole, selectedCity, selectedType, sortBy]);
 
-  // Pagination
   const pageSize = 15;
   const totalPages = Math.ceil(filteredJobs.length / pageSize) || 1;
   const paginatedList = useMemo(() => {
@@ -113,10 +123,51 @@ function JobsContent() {
 
   const clearAllFilters = () => {
     setSearch('');
+    setDebouncedSearch('');
     setSelectedRole('All');
     setSelectedCity('All');
     setSelectedType('All');
     setCurrentPage(1);
+  };
+
+  const getApplyButton = (job: JobCardData) => {
+    const status = job.linkStatus || 'VERIFIED';
+    if (status === 'EXPIRED') {
+      return (
+        <span className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-gray-800 text-gray-400 border border-gray-700 cursor-not-allowed">
+          Listing Closed
+        </span>
+      );
+    }
+    if (status === 'INVALID') {
+      return (
+        <span className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-rose-950/40 text-rose-300 border border-rose-800/40">
+          Source Expired
+        </span>
+      );
+    }
+    if (status === 'UNVERIFIED') {
+      return (
+        <a
+          href={job.applyUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30 transition-colors"
+        >
+          Open Original Listing ↗
+        </a>
+      );
+    }
+    return (
+      <a
+        href={job.applyUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black transition-colors"
+      >
+        Apply at Company ↗
+      </a>
+    );
   };
 
   return (
@@ -151,9 +202,9 @@ function JobsContent() {
           <label className="block text-[11px] font-mono uppercase text-gray-400 mb-1.5">Search Keywords</label>
           <input
             type="text"
-            placeholder="Title, company, or skill (e.g. React, Golang)..."
+            placeholder="Title, company, or skill (e.g. React, Python, SDE)..."
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+            onChange={(e) => setSearch(e.target.value)}
             className="w-full bg-[#0a0d0e] border border-[#232b30] rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 transition-colors"
           />
         </div>
@@ -172,8 +223,8 @@ function JobsContent() {
             <option value="AI / ML Engineering">AI / ML Engineering</option>
             <option value="Data Engineering">Data Engineering</option>
             <option value="DevOps / Cloud / SRE">DevOps / Cloud / SRE</option>
-            <option value="QA / Software Testing">QA / Software Testing</option>
-            <option value="Mobile Engineering">Mobile Engineering</option>
+            <option value="QA / Software Testing / SDET">QA / Testing / SDET</option>
+            <option value="Product Design / UI/UX">Product Design / UI/UX</option>
           </select>
         </div>
 
@@ -190,6 +241,7 @@ function JobsContent() {
             <option value="Pune">Pune</option>
             <option value="Delhi NCR">Delhi NCR</option>
             <option value="Mumbai">Mumbai</option>
+            <option value="Chennai">Chennai</option>
             <option value="Remote (India)">Remote (India)</option>
           </select>
         </div>
@@ -241,7 +293,7 @@ function JobsContent() {
                     {job.sourceName}
                   </span>
                   <span className="text-xs px-2 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 font-mono">
-                    0 Exp Verified
+                    {job.fresherEligibilityStatus || (job.employmentType === 'internship' ? 'Internship' : 'Fresher eligible')}
                   </span>
                 </div>
 
@@ -273,14 +325,7 @@ function JobsContent() {
                 >
                   View Details
                 </Link>
-                <a
-                  href={job.applyUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-4 py-2 text-xs font-semibold rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black transition-colors font-sans"
-                >
-                  Apply Directly ↗
-                </a>
+                {getApplyButton(job)}
               </div>
             </div>
           ))}
