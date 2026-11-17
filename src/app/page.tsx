@@ -1,8 +1,10 @@
-import { SAMPLE_200_JOBS } from '@/lib/sample-jobs';
+import { getAllJobSummariesAsync } from '@/lib/jobs-data';
 import Link from 'next/link';
 
-export default function LandingPage() {
-  const jobs = SAMPLE_200_JOBS;
+export const revalidate = 60;
+
+export default async function LandingPage() {
+  const jobs = await getAllJobSummariesAsync();
   const activeCount = jobs.length || 214;
   const uniqueCompanies = new Set(jobs.map(j => j.company)).size || 25;
   const uniqueCities = new Set(jobs.map(j => j.normalizedCity)).size || 8;
@@ -136,7 +138,7 @@ export default function LandingPage() {
                   <span>💼 {job.standardRole}</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5 mt-3">
-                  {job.requiredSkills.slice(0, 3).map((s, i) => (
+                  {job.requiredSkills?.slice(0, 3).map((s: string, i: number) => (
                     <span key={i} className="text-[11px] bg-[#161c20] text-gray-300 border border-[#232b30] px-2 py-0.5 rounded">
                       {s}
                     </span>

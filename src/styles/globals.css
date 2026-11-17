@@ -29,3 +29,51 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #374151;
 }
+
+/* Rich Job Description Typography */
+.job-description-content h1,
+.job-description-content h2,
+.job-description-content h3,
+.job-description-content h4 {
+  color: #f3f4f6;
+  font-weight: 700;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+.job-description-content h1 { font-size: 1.15rem; }
+.job-description-content h2 { font-size: 1.05rem; }
+.job-description-content h3 { font-size: 0.95rem; }
+.job-description-content p {
+  margin-bottom: 0.75rem;
+  line-height: 1.6;
+}
+.job-description-content ul,
+.job-description-content ol {
+  margin-left: 1.25rem;
+  margin-bottom: 0.75rem;
+  list-style-type: disc;
+}
+.job-description-content ol {
+  list-style-type: decimal;
+}
+.job-description-content li {
+  margin-bottom: 0.25rem;
+  line-height: 1.5;
+}
+.job-description-content a {
+  color: #34d399;
+  text-decoration: underline;
+}
+.job-description-content strong,
+.job-description-content b {
+  color: #ffffff;
+  font-weight: 600;
+}
+.job-description-content blockquote {
+  border-left: 3px solid #059669;
+  padding-left: 0.75rem;
+  color: #9ca3af;
+  font-style: italic;
+  margin: 0.75rem 0;
+}
+

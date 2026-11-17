@@ -31,7 +31,9 @@ export default function RootLayout({
             </Link>
 
             <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-300">
-              <Link href="/jobs" className="hover:text-white transition-colors">Explore Jobs</Link>
+              <Link href="/match" className="hover:text-emerald-400 transition-colors flex items-center gap-1.5 text-emerald-400">
+                <span>✦</span> Resume Match
+              </Link>
               <Link href="/methodology" className="hover:text-white transition-colors">Methodology & AI</Link>
               <Link href="/about" className="hover:text-white transition-colors">System Transparency</Link>
             </nav>

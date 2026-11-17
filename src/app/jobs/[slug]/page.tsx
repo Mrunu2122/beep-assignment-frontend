@@ -1,7 +1,8 @@
-import { SAMPLE_200_JOBS } from '@/lib/sample-jobs';
+import { getJobByIdOrSlugAsync, getAllJobSummariesAsync } from '@/lib/jobs-data';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { JobDescription } from '@/components/jobs/JobDescription';
 
 export async function generateMetadata({
   params,
@@ -9,7 +10,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const job = SAMPLE_200_JOBS.find(j => j.slug === slug);
+  const job = await getJobByIdOrSlugAsync(slug);
 
   if (!job) {
     return {
@@ -47,15 +48,16 @@ export default async function JobDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const job = SAMPLE_200_JOBS.find(j => j.slug === slug);
+  const job = await getJobByIdOrSlugAsync(slug);
 
   if (!job) {
     notFound();
   }
 
+  const allJobs = await getAllJobSummariesAsync();
   const isClosed = (job as any).listingStatus === 'EXPIRED' || (job as any).listingStatus === 'REMOVED';
 
-  const relatedJobs = SAMPLE_200_JOBS.filter(
+  const relatedJobs = allJobs.filter(
     j => j.id !== job.id && (j as any).listingStatus === 'ACTIVE' &&
          (j.standardRole === job.standardRole || j.normalizedCity === job.normalizedCity)
   ).slice(0, 3);
@@ -173,7 +175,13 @@ export default async function JobDetailPage({
             <p className="text-base text-emerald-400 font-semibold mt-1">{job.company}</p>
           </div>
 
-          <div>
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/match?jobId=${job.id}`}
+              className="px-5 py-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-semibold text-sm transition-all flex items-center gap-1.5 shadow-sm"
+            >
+              <span>✦</span> Match My Resume
+            </Link>
             {getApplyButton()}
           </div>
         </div>
@@ -239,7 +247,7 @@ export default async function JobDetailPage({
         <div className="py-6 border-b border-[#232b30]">
           <h2 className="text-xs font-mono text-gray-400 uppercase tracking-wider mb-3">Technical Competencies</h2>
           <div className="flex flex-wrap gap-2">
-            {job.requiredSkills.map((skill, sIdx) => (
+            {job.requiredSkills?.map((skill: string, sIdx: number) => (
               <span key={sIdx} className="text-xs font-mono bg-[#161c20] text-emerald-300 border border-emerald-500/20 px-3 py-1 rounded-md">
                 {skill}
               </span>
@@ -250,9 +258,9 @@ export default async function JobDetailPage({
         {/* Description & Transparency */}
         <div className="mt-6 space-y-4 text-sm text-gray-300 leading-relaxed">
           <h2 className="text-base font-semibold text-white">Full Sourced Job Details</h2>
-          <p className="whitespace-pre-line text-xs text-gray-300 bg-[#0a0d0e]/60 p-4 rounded-xl border border-[#232b30] leading-relaxed">
-            {job.description}
-          </p>
+          <div className="bg-[#0a0d0e]/60 p-5 rounded-xl border border-[#232b30]">
+            <JobDescription content={job.description} />
+          </div>
 
           <div className="p-4 rounded-xl border border-[#232b30] bg-[#0a0d0e] mt-6">
             <div className="text-xs font-mono text-gray-400 uppercase tracking-wider">Provenance & Source-of-Truth Audit Trail</div>

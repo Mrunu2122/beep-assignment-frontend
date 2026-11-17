@@ -2,7 +2,7 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  transpilePackages: ['@launchpad/shared'],
+  serverExternalPackages: ['pdf-parse', 'pdfjs-dist', 'mammoth'],
   experimental: {
     // optimize package imports for icons
     optimizePackageImports: ['lucide-react'],
@@ -10,3 +10,4 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+

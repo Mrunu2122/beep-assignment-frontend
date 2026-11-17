@@ -45,6 +45,7 @@ function JobsContent() {
 
   const [jobs, setJobs] = useState<JobCardData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -58,17 +59,26 @@ function JobsContent() {
     async function loadData() {
       try {
         setLoading(true);
-        const res = await fetch('/api/jobs-data.json').catch(() => null);
+        setErrorMessage(null);
+        // Primary: fetch live dataset from Supabase via /api/jobs
+        const res = await fetch('/api/jobs').catch(() => null);
         if (res && res.ok) {
           const json = await res.json();
+          if (Array.isArray(json) && json.length > 0) {
+            setJobs(json);
+            return;
+          }
+        }
+        // Controlled offline/development fallback
+        const staticRes = await fetch('/api/jobs-data.json').catch(() => null);
+        if (staticRes && staticRes.ok) {
+          const json = await staticRes.json();
           setJobs(json);
         } else {
-          const staticSeed = await import('@/lib/sample-jobs');
-          setJobs(staticSeed.SAMPLE_200_JOBS as unknown as JobCardData[]);
+          setErrorMessage('Unable to load live jobs from database. Please refresh.');
         }
       } catch {
-        const staticSeed = await import('@/lib/sample-jobs');
-        setJobs(staticSeed.SAMPLE_200_JOBS as unknown as JobCardData[]);
+        setErrorMessage('Failed to connect to database.');
       } finally {
         setLoading(false);
       }
@@ -274,6 +284,14 @@ function JobsContent() {
         </div>
       </div>
 
+      {/* Error notification if any */}
+      {errorMessage && (
+        <div className="mt-4 p-3 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs flex items-center justify-between">
+          <span>{errorMessage}</span>
+          <button onClick={() => window.location.reload()} className="underline font-semibold ml-2">Reload</button>
+        </div>
+      )}
+
       {/* Loading Skeletons */}
       {loading ? (
         <div className="mt-8 space-y-4">
@@ -348,10 +366,17 @@ function JobsContent() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 self-start md:self-center">
+                <div className="flex items-center gap-2 self-start md:self-center">
+                  <Link
+                    href={`/match?jobId=${job.id}`}
+                    className="px-3.5 py-2 text-xs font-semibold rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 transition-colors flex items-center gap-1"
+                    title="Check your resume compatibility against this role"
+                  >
+                    <span>✦</span> Match
+                  </Link>
                   <Link
                     href={`/jobs/${job.slug}`}
-                    className="px-4 py-2 text-xs font-semibold rounded-lg border border-[#232b30] bg-[#161c20] hover:bg-[#232b30] text-gray-200 transition-colors"
+                    className="px-3.5 py-2 text-xs font-semibold rounded-lg border border-[#232b30] bg-[#161c20] hover:bg-[#232b30] text-gray-200 transition-colors"
                   >
                     View Details
                   </Link>

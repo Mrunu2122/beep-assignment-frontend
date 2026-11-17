@@ -18,7 +18,9 @@ export default function AdminObservabilityPage() {
   const triggerManualRefresh = async () => {
     setRefreshing(true);
     try {
-      const res = await fetch('http://localhost:4000/api/cron/ingest', {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+      const cleanUrl = backendUrl.replace(/\/+$/, '');
+      const res = await fetch(`${cleanUrl}/api/cron/ingest`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
