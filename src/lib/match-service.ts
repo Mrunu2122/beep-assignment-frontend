@@ -1,4 +1,4 @@
-import { PDFParse } from 'pdf-parse';
+import { extractText } from 'unpdf';
 import mammoth from 'mammoth';
 import {
   ExtractedResume,
@@ -30,9 +30,8 @@ export async function parseResumeDocument(
 
   if (lowerName.endsWith('.pdf') || mimetype === 'application/pdf') {
     try {
-      const parser = new (PDFParse as any)({ data: fileBuffer });
-      const result = await parser.getText();
-      const text = result?.text?.trim() || '';
+      const { text: extracted } = await extractText(new Uint8Array(fileBuffer), { mergePages: true });
+      const text = (Array.isArray(extracted) ? extracted.join('\n') : (extracted || '')).trim();
       if (!text || text.length < 50) {
         throw new Error('Document contains insufficient extractable text. Scanned or image-only PDFs require OCR or a text-based format.');
       }
@@ -42,6 +41,9 @@ export async function parseResumeDocument(
         format: 'pdf'
       };
     } catch (err: any) {
+      if (err.message && err.message.includes('insufficient extractable text')) {
+        throw err;
+      }
       throw new Error(`PDF Parsing failed: ${err.message || 'Corrupted or encrypted PDF'}`);
     }
   }
